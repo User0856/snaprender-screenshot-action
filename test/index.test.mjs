@@ -117,6 +117,26 @@ test('captureAll + run: writes files, outputs, summary; failures reported', asyn
   assert.equal(f.calls[0].body.response_type, 'binary');
 });
 
+test('signed URLs carry the commit in the fragment so each commit gets a fresh image', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sr-action-'));
+  const signedBodies = [];
+  const f = fakeFetch((url, body) => {
+    if (url.endsWith('/v1/screenshot/sign')) { signedBodies.push(body); return { status: 200, body: JSON.stringify({ signed_url: 'https://app.snap-render.com/s' }) }; }
+    return { status: 200, body: 'IMG' };
+  });
+  const base = { 'api-key': 'k', urls: 'https://preview.example/\nhttps://spa.example/#/pricing', 'output-dir': join(dir, 's'), 'signed-urls': 'true' };
+  await run({ ...env(base), GITHUB_SHA: 'abcdef1234567890' }, { fetchImpl: f, wait: noWait, log: () => {} });
+  assert.equal(signedBodies[0].url, 'https://preview.example/#sr-abcdef1');
+  assert.equal(signedBodies[1].url, 'https://spa.example/#/pricing', 'existing fragments are left alone');
+  assert.equal(f.calls.find((c) => !c.url.endsWith('/sign')).body.url, 'https://preview.example/', 'the capture itself uses the plain URL');
+  signedBodies.length = 0;
+  await run({ ...env({ ...base, 'signed-url-per-commit': 'false' }), GITHUB_SHA: 'abcdef1234567890' }, { fetchImpl: f, wait: noWait, log: () => {} });
+  assert.equal(signedBodies[0].url, 'https://preview.example/');
+  signedBodies.length = 0;
+  await run(env(base), { fetchImpl: f, wait: noWait, log: () => {} });
+  assert.equal(signedBodies[0].url, 'https://preview.example/', 'no commit outside Actions');
+});
+
 test('run: fail-on-error false keeps the step green', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'sr-action-'));
   const f = fakeFetch(() => ({ status: 422, body: '{"error":{"code":"TARGET_SSL_ERROR","message":"Bad certificate."}}' }));

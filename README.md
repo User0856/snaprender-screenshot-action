@@ -120,6 +120,7 @@ By default the step fails when any URL cannot be captured, and the reason is sho
 | `quality` | | JPEG and WebP quality, 1 to 100. |
 | `output-dir` | `snaprender-screenshots` | Where the files are written. |
 | `signed-urls` | `false` | Also create image links valid for 7 days, for comments and dashboards. |
+| `signed-url-per-commit` | `true` | One signed image per commit, so a comment on a new commit never shows the cached image of an earlier one. |
 | `fail-on-error` | `true` | Fail the step when any URL could not be captured. |
 
 ## Outputs
@@ -136,7 +137,7 @@ The step also writes a table of results to the job summary.
 
 ## Good to know
 
-- **Captures.** Every URL uses one capture from your plan. Failed captures are not counted. A signed URL renders when it is first opened (one more capture); later views are served from cache for free.
+- **Captures.** Every URL uses one capture from your plan. Failed captures are not counted. A signed URL renders when it is first opened (one more capture); later views are served from cache for free. Each commit gets its own signed image (the commit is added to the URL fragment, which the page never sees), so set `signed-url-per-commit: false` if you would rather reuse one cached image.
 - **Rate limits.** If you hit the per-minute limit, the action waits and retries on its own. When the monthly allowance is used up it stops and says so.
 - **Public pages only.** Pages are rendered on SnapRender's servers, so `localhost` and private networks are out of reach. Point it at a deployed preview.
 - **Your key.** The action masks the key in logs. Signed URLs contain only a short prefix of the key, never the key itself.

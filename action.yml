@@ -64,6 +64,10 @@ inputs:
     description: Also create signed image URLs (valid 7 days) that can be shown in pull request comments. Each signed URL renders when it is first opened.
     required: false
     default: "false"
+  signed-url-per-commit:
+    description: Give each commit its own signed image (adds "#sr-<commit>" to the page URL inside the signed link, which pages never see), so comments on later commits do not show a cached image of an earlier one. Set to false to share one cached image across commits.
+    required: false
+    default: "true"
   fail-on-error:
     description: Fail the step when any URL could not be captured.
     required: false

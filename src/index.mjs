@@ -65,6 +65,8 @@ export function parseInputs(env) {
     },
     outputDir: getInput(env, 'output-dir') || 'snaprender-screenshots',
     signedUrls: bool(getInput(env, 'signed-urls'), 'signed-urls'),
+    signedUrlPerCommit: bool(getInput(env, 'signed-url-per-commit') || 'true', 'signed-url-per-commit'),
+    commit: (env.GITHUB_SHA || '').slice(0, 7),
     failOnError: bool(getInput(env, 'fail-on-error') || 'true', 'fail-on-error'),
   };
 }
@@ -131,6 +133,17 @@ export async function request(fetchImpl, path, apiKey, payload, { retries = 4, w
   }
 }
 
+/**
+ * Signed URLs are rendered once and then served from cache, keyed by the page URL and options. A preview URL that
+ * stays the same across commits would show the first commit's image in every later comment, so the commit goes into
+ * the URL fragment (#sr-<sha>): browsers never send fragments to the server, the page renders the same, and each
+ * commit gets its own image. URLs that already have a fragment (hash routing) are left alone.
+ */
+export function signedTarget(url, cfg) {
+  if (!cfg.signedUrlPerCommit || !cfg.commit || url.includes('#')) return url;
+  return `${url}#sr-${cfg.commit}`;
+}
+
 export async function captureAll(cfg, { fetchImpl = fetch, wait = sleep, log = console.log } = {}) {
   mkdirSync(cfg.outputDir, { recursive: true });
   const taken = new Set();
@@ -149,7 +162,7 @@ export async function captureAll(cfg, { fetchImpl = fetch, wait = sleep, log = c
       log(`::warning title=SnapRender::${escapeData(`${url}: ${result.error}`)}`);
     }
     if (cfg.signedUrls && !result.error) {
-      const signed = await request(fetchImpl, '/v1/screenshot/sign', cfg.apiKey, clean({ url, ...cfg.options, expires_in: SIGNED_URL_TTL }), { wait });
+      const signed = await request(fetchImpl, '/v1/screenshot/sign', cfg.apiKey, clean({ url: signedTarget(url, cfg), ...cfg.options, expires_in: SIGNED_URL_TTL }), { wait });
       if (signed.ok) {
         try { result.signed_url = JSON.parse(signed.body.toString('utf8')).signed_url ?? null; } catch { /* leave null */ }
       } else {
